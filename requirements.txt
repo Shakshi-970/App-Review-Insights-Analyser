@@ -1,0 +1,27 @@
+# Foundations
+pydantic
+pydantic-settings
+python-dotenv
+
+# LLM & AI
+groq
+sentence-transformers
+numpy
+pandas
+pyarrow
+umap-learn
+scikit-learn>=1.3
+
+# Ingestion
+requests
+beautifulsoup4
+feedparser
+google-play-scraper
+langdetect
+emoji
+
+# MCP
+mcp
+
+# Testing
+pytest

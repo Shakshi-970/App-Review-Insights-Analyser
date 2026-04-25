@@ -1,0 +1,20 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy only the source needed for this server
+COPY src/phase0_foundations/ src/phase0_foundations/
+COPY src/phase6_gmail_mcp/   src/phase6_gmail_mcp/
+
+# Required env vars at runtime:
+#   SENDER_EMAIL      — Gmail address used to send
+#   GMAIL_APP_PASSWORD — Gmail App Password (not the account password)
+#   SEND_MODE         — "production" to send, anything else to draft
+
+EXPOSE 8001
+
+CMD ["python", "src/phase6_gmail_mcp/server.py", "--transport", "sse", "--port", "8001"]

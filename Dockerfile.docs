@@ -1,0 +1,20 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    google-auth google-auth-httplib2 google-api-python-client
+
+# Copy only the source needed for this server
+COPY src/phase0_foundations/ src/phase0_foundations/
+COPY src/phase5_docs_mcp/    src/phase5_docs_mcp/
+
+# credentials.json is NOT baked into the image.
+# At runtime, pass GOOGLE_CREDENTIALS_BASE64 (base64-encoded JSON) as an env var.
+# The server will decode it to a temp file automatically.
+
+EXPOSE 8000
+
+CMD ["python", "src/phase5_docs_mcp/server.py", "--transport", "sse", "--port", "8000"]

@@ -1,0 +1,36 @@
+# Secrets — never commit
+.env
+credentials.json
+*.key
+*.pem
+token.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Runtime artifacts
+run_log.db
+logs/
+*.log
+
+# Data files (scraped, generated)
+src/phase1_ingestion/data/
+src/phase2_clustering/data/
+src/phase3_summarization/data/
+src/phase4_renderer/data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
