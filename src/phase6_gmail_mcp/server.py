@@ -4,6 +4,7 @@ import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.server import TransportSecuritySettings
 from dotenv import load_dotenv
 
 # Load env for testing standalone
@@ -13,7 +14,8 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("gmail-mcp")
 
-mcp = FastMCP("GmailSMTP")
+# DNS rebinding protection disabled — server runs behind HF/cloud reverse proxy
+mcp = FastMCP("GmailSMTP", transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
 
 # Settings from Env
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", "sshakshi970@gmail.com")

@@ -6,13 +6,15 @@ import tempfile
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.server import TransportSecuritySettings
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("google-docs-mcp")
 
 # MCP Server Definition
-mcp = FastMCP("GoogleDocs")
+# DNS rebinding protection disabled — server runs behind HF/cloud reverse proxy
+mcp = FastMCP("GoogleDocs", transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
 
 # Resolve credentials: prefer base64 env var (cloud), fall back to file (local)
 _HERE = os.path.dirname(os.path.abspath(__file__))
