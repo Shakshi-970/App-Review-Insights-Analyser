@@ -1,39 +1,58 @@
-Excited to share my submission for the App Review Insights Analyser — an end-to-end AI agent that turns raw app store reviews into a weekly product pulse, automatically.
+[X/5] — PM Fellowship Challenge | App Review Insights Analyser
 
-**The problem it solves:**
-Product and growth teams drown in thousands of Play Store and App Store reviews every week. There's signal in there — but no time to read it. I built an autonomous agent that does it for them: scrape → cluster → summarize → deliver.
+I used to wonder how PMs at companies like Groww actually know what's frustrating users.
 
-**What it does (end to end):**
-- Imports the last 104 weeks of reviews from both App Store and Play Store
-- Groups them into themes using semantic clustering (no manual tagging)
-- Generates a one-page weekly note: top themes, real user quotes, 3 action ideas
-- Appends the report to a shared Google Doc
-- Sends a formatted teaser email — automatically, every week
+Do they read every review? That's 1,800+ reviews a week just for one app.
+Do they rely on support tickets? Those only catch the loudest complaints.
 
-**Tech stack & why:**
+So I built something to do it automatically.
 
-🔵 **Groq + Llama-3.3-70b-versatile** — Ultra-fast inference for summarization and the orchestration agent loop. Tool-calling API lets the LLM decide which pipeline step to run next.
+---
 
-🟢 **sentence-transformers (all-MiniLM-L6-v2)** — Lightweight, accurate embeddings for 1,800+ reviews in seconds. No GPU needed.
+Here's what the agent does every week — without me touching anything:
 
-📐 **UMAP + HDBSCAN** — Density-based clustering that finds natural theme boundaries without forcing a fixed number of clusters. Noise reviews are automatically filtered.
+1. Pulls the latest Play Store + App Store reviews for Groww
+2. Groups them into themes based on what users are *actually* talking about — not what I assume they're talking about
+3. Writes a one-page pulse: top themes, real quotes, 3 action ideas
+4. Drops the report into a Google Doc
+5. Sends me a formatted email with a link to the full report
 
-🔌 **FastMCP (Model Context Protocol)** — Built custom MCP servers for Google Docs and Gmail. The agent calls them as tools — clean separation between reasoning and execution.
+No manual work. No copy-pasting. Just a clean weekly brief, ready Monday morning.
 
-☁️ **HuggingFace Spaces** — Free Docker hosting for the Docs MCP server. No credit card required.
+---
 
-🗃️ **SQLite run log** — Every run is logged with token usage, delivery IDs, and status. Idempotent by design — re-running the same week is always a no-op.
+The part that surprised me most?
 
-**Deliverables shipped:**
-✅ Deployed MCP server on HuggingFace Spaces
-✅ Live Google Doc with the Groww 2026-W17 pulse report
-✅ Email teaser delivered to inbox (Gmail SMTP via MCP)
-✅ Reviews CSV — 1,818 Groww reviews, PII-scrubbed
-✅ README with one-command re-run and theme legend
+I thought I could just ask the AI: *"Find me 5 themes in these 1,800 reviews."*
 
-**What I learned:**
-Clustering beats prompting for theme discovery. Asking an LLM to "find 5 themes in 1,800 reviews" in one shot is expensive and inconsistent. Embedding → UMAP → HDBSCAN → LLM-per-cluster is faster, cheaper, and more grounded — every quote is substring-validated against the source.
+That didn't work well. The LLM kept hallucinating themes and making up quotes.
+
+The fix was to first *cluster* the reviews mathematically (grouping similar reviews together using embeddings + UMAP + HDBSCAN), and then ask the LLM to summarize *each cluster* separately. Every quote in the final report is substring-matched against the actual review — so nothing is made up.
+
+Lesson: Use AI to summarize. Use math to group.
+
+---
+
+Tech I used (and why):
+
+→ **Groq + Llama 3** — fast enough to process all clusters in under a minute
+→ **sentence-transformers** — converts reviews into vectors so similar complaints group together
+→ **UMAP + HDBSCAN** — finds natural clusters without me pre-defining categories
+→ **FastMCP** — lets the AI agent "talk to" Google Docs and Gmail like tools
+→ **HuggingFace Spaces** — free cloud hosting, no credit card needed
+
+---
+
+What this means for a PM:
+
+Instead of spending 2 hours reading reviews on Sunday night, you get a structured brief that tells you exactly what to bring up in Monday's standup.
+
+That's the real value — not the tech, but the time it gives back.
+
+---
 
 GitHub → https://github.com/Shakshi-970/App-Review-Insights-Analyser
 
-#AI #LLM #MCP #ProductManagement #MachineLearning #Groq #HuggingFace #Python #GenerativeAI #AIAgents
+Grateful to be learning this as part of the @NextLeap PM Fellowship — the projects here are genuinely making me think differently about AI in product work.
+
+#NextLeapPMFellowship #AI #ProductManagement #GenerativeAI #LLM #AIAgents #MCP #Groq #Python
