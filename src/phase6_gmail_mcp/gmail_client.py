@@ -52,8 +52,16 @@ class GmailClient:
             )
             params = {"to": recipient, "subject": subject, "body": html_content}
             result = await session.call_tool(tool_name, params)
-            result_data = result.content if hasattr(result, 'content') else result
-            return {"status": "success", "tool_used": tool_name, "result": result_data}
+            # Parse actual tool result — don't swallow errors
+            if hasattr(result, 'content') and result.content:
+                import json as _json
+                try:
+                    tool_result = _json.loads(result.content[0].text)
+                except Exception:
+                    tool_result = {"status": "unknown", "raw": str(result.content[0].text)}
+            else:
+                tool_result = {"status": "unknown"}
+            return tool_result
 
     def run_send_teaser(self, recipient: str, subject: str, html_content: str) -> Dict[str, Any]:
         """Synchronous wrapper for send_teaser."""
