@@ -8,7 +8,8 @@ An autonomous AI Agent that scrapes, clusters, and summarizes app-store reviews 
 
 | Artifact | Location |
 |---|---|
-| Deployed Docs MCP | [shakshi-970-docs-mcp.hf.space](https://shakshi-970-docs-mcp.hf.space) |
+| Deployed Docs MCP (Space) | [huggingface.co/spaces/Shakshi-970/docs-mcp](https://huggingface.co/spaces/Shakshi-970/docs-mcp) |
+| Docs MCP SSE endpoint | `https://shakshi-970-docs-mcp.hf.space/sse` (MCP clients only — returns 404 in browser) |
 | Live Google Doc | [Open report doc](https://docs.google.com/document/d/1DruFduVM98OxDjNlmupSOBXOPV5ET0AtSEJPrQFLV9Q) |
 | Latest weekly note | `deliverables/weekly_note_Groww_2026-W17.md` |
 | Email draft sample | `deliverables/email_draft_sample.md` |
