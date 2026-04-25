@@ -60,8 +60,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Gmail MCP Server")
     parser.add_argument("--transport", choices=["stdio", "sse"], default="stdio",
                         help="Transport mode: stdio (local) or sse (deployed)")
-    parser.add_argument("--port", type=int, default=8001,
-                        help="HTTP port for SSE transport (default: 8001)")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8001)),
+                        help="HTTP port for SSE transport (default: $PORT or 8001)")
     parser.add_argument("--host", default="0.0.0.0",
                         help="Host for SSE transport (default: 0.0.0.0)")
     args = parser.parse_args()

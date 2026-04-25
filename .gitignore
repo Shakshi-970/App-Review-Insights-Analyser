@@ -34,3 +34,5 @@ src/phase4_renderer/data/
 # OS
 .DS_Store
 Thumbs.db
+
+credentials_b64.txt

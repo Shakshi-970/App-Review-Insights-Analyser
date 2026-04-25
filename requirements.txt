@@ -23,5 +23,10 @@ emoji
 # MCP
 mcp
 
+# Google APIs (used by Docs MCP server)
+google-auth
+google-auth-httplib2
+google-api-python-client
+
 # Testing
 pytest

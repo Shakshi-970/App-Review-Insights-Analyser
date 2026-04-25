@@ -17,4 +17,4 @@ COPY src/phase6_gmail_mcp/   src/phase6_gmail_mcp/
 
 EXPOSE 8001
 
-CMD ["python", "src/phase6_gmail_mcp/server.py", "--transport", "sse", "--port", "8001"]
+CMD ["python", "src/phase6_gmail_mcp/server.py", "--transport", "sse"]
