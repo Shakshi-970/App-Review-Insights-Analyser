@@ -39,7 +39,7 @@ flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
 creds = flow.run_local_server(port=0)
 
 print("\n" + "="*60)
-print("Add these 3 secrets to your HF Space (Settings → Secrets):")
+print("Add these 3 secrets to your HF Space (Settings > Secrets):")
 print("="*60)
 print(f"GMAIL_CLIENT_ID     = {CLIENT_ID}")
 print(f"GMAIL_CLIENT_SECRET = {CLIENT_SECRET}")
