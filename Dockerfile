@@ -23,6 +23,8 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONIOENCODING=utf-8
 
-EXPOSE 8080
+# HuggingFace Spaces requires port 7860.
+# For local dev or Railway, override via PORT env var.
+EXPOSE 7860
 
 ENTRYPOINT ["./entrypoint.sh"]
