@@ -765,12 +765,17 @@ async function sendEmailInline() {
   btn.disabled = true;
   btn.style.opacity = '0.7';
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000); // 20s timeout
+
   try {
     const res = await fetch('/send_email_direct', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({subject: window._draftSubject, html: window._draftHtml})
+      body: JSON.stringify({subject: window._draftSubject, html: window._draftHtml}),
+      signal: controller.signal
     });
+    clearTimeout(timeout);
     const data = await res.json();
 
     if (data.status === 'ok' || data.status === 'sent') {
@@ -778,29 +783,50 @@ async function sendEmailInline() {
       btn.style.background = 'var(--purple)';
       btn.style.boxShadow = '0 4px 18px rgba(108,99,255,0.35)';
       btn.style.opacity = '1';
-
-      // Mark email phase card as Done
       setPhase('email', 'done', 'Done ✓');
       setProg(100);
-
-      // Update overall status
       _emailPaused = false;
       setTick('status', 'Complete', 'up');
       document.getElementById('resBadge').classList.add('show');
-
       log('[✓] Email sent successfully!');
     } else {
-      alert('Failed to send: ' + (data.message || 'Unknown error'));
-      btn.textContent = 'Send Email 🚀';
-      btn.disabled = false;
-      btn.style.opacity = '1';
+      showEmailFallback(btn, data.message || 'SMTP send failed');
     }
   } catch (err) {
-    alert('Network error: ' + err.message);
-    btn.textContent = 'Send Email 🚀';
-    btn.disabled = false;
-    btn.style.opacity = '1';
+    clearTimeout(timeout);
+    const msg = err.name === 'AbortError'
+      ? 'SMTP port blocked on this host — use Download below.'
+      : 'Network error: ' + err.message;
+    showEmailFallback(btn, msg);
   }
+}
+
+function showEmailFallback(btn, reason) {
+  const sec = btn.closest('.email-send-section');
+  btn.remove();
+
+  const box = document.createElement('div');
+  box.style.cssText = 'background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:14px;text-align:center;';
+  box.innerHTML = `
+    <div style="color:#F59E0B;font-weight:700;margin-bottom:6px;">⚠ SMTP blocked on this host</div>
+    <div style="color:#94A3B8;font-size:11px;margin-bottom:12px;">${reason}</div>
+    <button onclick="downloadEmail()"
+      style="padding:11px 24px;background:var(--purple);color:#fff;border:none;border-radius:8px;
+             font-weight:700;cursor:pointer;font-size:13px;">
+      ⬇ Download Email HTML
+    </button>
+    <div style="color:#4A5568;font-size:10px;margin-top:8px;">Open the downloaded file in a browser, then copy-paste into Gmail / Outlook.</div>
+  `;
+  sec.appendChild(box);
+  log('[!] SMTP blocked — email HTML ready to download.');
+}
+
+function downloadEmail() {
+  const blob = new Blob([window._draftHtml || ''], {type: 'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (window._draftSubject || 'email') + '.html';
+  a.click();
 }
 </script>
 

@@ -116,7 +116,7 @@ async def send_email_direct(req: EmailRequest):
         msg['Subject'] = req.subject
         msg.attach(MIMEText(req.html, 'html'))
 
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=15) as server:
             server.login(sender, app_password)
             server.send_message(msg)
 
