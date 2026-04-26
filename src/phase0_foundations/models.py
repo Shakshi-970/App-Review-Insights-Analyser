@@ -47,7 +47,7 @@ class RunRecord(BaseModel):
     run_id: str
     product: str
     iso_week: str
-    status: Literal["success", "failed", "skipped"]
+    status: Literal["success", "failed", "skipped", "pending_email"]
     doc_id: Optional[str] = None
     heading_id: Optional[str] = None
     email_message_id: Optional[str] = None

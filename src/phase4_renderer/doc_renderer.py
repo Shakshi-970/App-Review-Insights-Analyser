@@ -1,33 +1,38 @@
 from datetime import datetime
+
 from src.phase0_foundations.models import PulseReport
+
 
 class DocRenderer:
     """
     Converts a PulseReport into Markdown suitable for Google Docs.
+    Keep output ASCII-only to avoid rendering/encoding issues.
     """
 
     def render(self, report: PulseReport) -> str:
         anchor = self.generate_anchor(report.product, report.iso_week)
-        now    = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        top    = report.themes[:3]
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        top = report.themes[:3]
 
-        md = []
+        md: list[str] = []
 
         # Title + anchor
-        md.append(f'## \U0001f4ca Weekly Pulse — {report.product} — {report.iso_week} <a name="{anchor}"></a>')
-        md.append(f"*Period: {report.period} | \U0001f4c8 Reviews Analyzed: **{report.review_count}***")
+        md.append(
+            f'## Weekly Pulse — {report.product} — {report.iso_week} <a name="{anchor}"></a>'
+        )
+        md.append(f"*Period: {report.period} | Reviews Analyzed: **{report.review_count}***")
         md.append("")
         md.append("---")
         md.append("")
 
-        # Top 3 Themes summary
-        md.append("### \U0001f3c6 Top 3 Themes")
+        # Top themes summary
+        md.append("### Top 3 Themes")
         for theme in top:
             md.append(f"- **{theme.name}**: {theme.description}")
         md.append("")
 
         # Customer Voice
-        md.append("### \U0001f4ac Customer Voice")
+        md.append("### Customer Voice")
         for theme in top:
             md.append(f"#### {theme.name}")
             for quote in theme.quotes[:3]:
@@ -35,7 +40,7 @@ class DocRenderer:
         md.append("")
 
         # Actionable Insights
-        md.append("### \U0001f4a1 Actionable Insights")
+        md.append("### Actionable Insights")
         for theme in top:
             md.append(f"**Addressing {theme.name}:**")
             for idea in theme.action_ideas[:3]:
@@ -50,3 +55,4 @@ class DocRenderer:
     @staticmethod
     def generate_anchor(product: str, iso_week: str) -> str:
         return f"pulse-{product.lower()}-{iso_week.lower()}"
+

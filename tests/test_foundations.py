@@ -11,12 +11,13 @@ class TestFoundations(unittest.TestCase):
         self.log = RunLog(self.db_path)
 
     def tearDown(self):
-        # We might not be able to delete on Windows immediately
-        try:
-            if os.path.exists(self.db_path):
-                os.remove(self.db_path)
-        except:
-            pass
+        for suffix in ("", "-journal", "-wal", "-shm"):
+            path = self.db_path + suffix
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except Exception:
+                pass
 
     def test_run_record_creation(self):
         run = RunRecord(

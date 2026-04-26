@@ -4,7 +4,7 @@ from typing import List
 class Settings(BaseSettings):
     # LLM Settings
     GROQ_API_KEY: str = ""
-    DEFAULT_MODEL: str = "llama-3.3-70b-versatile"
+    DEFAULT_MODEL: str = "llama-3.1-8b-instant"
     
     # Ingestion Settings
     SUPPORTED_PRODUCTS: List[str] = ["INDMoney", "Groww", "PowerUp Money", "Wealth Monitor", "Kuvera"]
@@ -22,7 +22,8 @@ class Settings(BaseSettings):
         "Wealth Monitor": "com.wealthmonitor",
         "Kuvera": "com.kuvera.app"
     }
-    ROLLING_WINDOW_WEEKS: int = 104
+    ROLLING_WINDOW_WEEKS: int = 4
+    MIN_REVIEW_LENGTH: int = 10
     MAX_REVIEW_LENGTH: int = 2000
     
     # MCP Settings — local stdio (used when *_URL is empty)
@@ -37,8 +38,15 @@ class Settings(BaseSettings):
     
     # Operation Settings
     SEND_MODE: str = "staging"  # staging (draft) or production (send)
-    REVIEWS_TO_SCRAPE: int = 5000
+    REVIEWS_TO_SCRAPE: int = 2000
+    CLUSTERING_SAMPLE_SIZE: int = 2000
     TOKEN_BUDGET_PER_RUN: int = 500000
+
+    # Summarization performance knobs (Phase 3)
+    SUMMARIZE_INTER_CALL_DELAY_S: float = 2.0
+    SUMMARIZE_MAX_THEMES: int = 15
+    SUMMARIZE_MAX_REP_REVIEWS: int = 4
+    SUMMARIZE_MAX_REVIEW_CHARS: int = 180
     
     GOOGLE_DOCS_ID: str = ""
     RECIPIENT_EMAIL: str = ""

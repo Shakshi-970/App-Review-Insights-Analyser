@@ -52,10 +52,12 @@ def gmail_send_message(to: str, subject: str, body: str) -> dict:
 @mcp.tool()
 def gmail_create_draft(to: str, subject: str, body: str) -> dict:
     """
-    SMTP doesn't support drafts directly. This tool will just send the email 
-    in this implementation, or you can use it to 'log' the intent.
+    Log the draft intent without sending.  SMTP has no native draft
+    concept, so we simply acknowledge and return metadata.  The actual
+    send happens later via gmail_send_message when the user approves.
     """
-    return gmail_send_message(to, f"[DRAFT] {subject}", body)
+    logger.info(f"Draft created (NOT sent). To: {to}, Subject: {subject}")
+    return {"status": "drafted", "to": to, "subject": subject}
 
 if __name__ == "__main__":
     import argparse

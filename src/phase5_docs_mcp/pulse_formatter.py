@@ -38,10 +38,10 @@ class PulseDocFormatter:
         self.req.append({
             "updateDocumentStyle": {
                 "documentStyle": {
-                    "marginTop":    {"magnitude": 28, "unit": "PT"},
-                    "marginBottom": {"magnitude": 28, "unit": "PT"},
-                    "marginLeft":   {"magnitude": 40, "unit": "PT"},
-                    "marginRight":  {"magnitude": 40, "unit": "PT"},
+                    "marginTop":    {"magnitude": 20, "unit": "PT"},
+                    "marginBottom": {"magnitude": 20, "unit": "PT"},
+                    "marginLeft":   {"magnitude": 30, "unit": "PT"},
+                    "marginRight":  {"magnitude": 30, "unit": "PT"},
                 },
                 "fields": "marginTop,marginBottom,marginLeft,marginRight"
             }
@@ -54,7 +54,7 @@ class PulseDocFormatter:
 
         # ── HEADER ─────────────────────────────────────────────────────────
         self._p("Weekly Pulse  ·  " + report.product,
-                bold=True, color=_BLUE, size=21,
+                bold=True, color=_BLUE, size=20,
                 sp_above=0, sp_below=2, ls=100)
 
         self._p(report.iso_week,
@@ -63,42 +63,53 @@ class PulseDocFormatter:
 
         self._p(f"{report.period}  ·  {report.review_count:,} reviews analysed",
                 italic=True, color=_GRAY, size=10,
-                sp_above=0, sp_below=3, ls=100)
+                sp_above=0, sp_below=2, ls=100)
 
-        self._divider(_BLUE, sp_above=2, sp_below=4)
+        self._divider(_BLUE, sp_above=2, sp_below=2)
 
-        # ── TOP 3 THEMES ───────────────────────────────────────────────────
-        self._label("TOP 3 THEMES", color=_BLUE, sp_below=4)
+        # ── TOP THEMES ───────────────────────────────────────────────────
+        self._label(f"TOP {len(top)} THEMES", color=_BLUE, sp_below=2)
 
         for i, theme in enumerate(top):
             acc = _ACCENTS[i]
             self._card_head(theme.name, accent=acc)
             self._body(theme.description, sp_below=2)
 
-        self._divider(_TEAL, sp_above=3, sp_below=4)
+        self._divider(_TEAL, sp_above=2, sp_below=2)
 
         # ── CUSTOMER VOICE ─────────────────────────────────────────────────
-        self._label("CUSTOMER VOICE", color=_TEAL, sp_below=4)
+        self._label("CUSTOMER VOICE", color=_TEAL, sp_below=2)
 
         for i, theme in enumerate(top):
             acc = _ACCENTS[i]
             self._subhead(theme.name, accent=acc, sp_above=2, sp_below=1)
-            for quote in theme.quotes[:3]:
-                self._quote(quote)
+            
+            # Deduplicate quotes preserving order
+            seen = set()
+            unique_quotes = []
+            for q in theme.quotes:
+                q_clean = q.strip().strip('"').strip("'")
+                q_lower = q_clean.lower()
+                if q_lower not in seen:
+                    seen.add(q_lower)
+                    unique_quotes.append(q_clean)
+                    
+            for q in unique_quotes[:3]:
+                self._quote(q)
 
-        self._divider(_BLUE, sp_above=3, sp_below=4)
+        self._divider(_BLUE, sp_above=2, sp_below=2)
 
         # ── ACTIONABLE INSIGHTS ────────────────────────────────────────────
-        self._label("ACTIONABLE INSIGHTS", color=_BLUE, sp_below=4)
+        self._label("ACTIONABLE INSIGHTS", color=_BLUE, sp_below=2)
 
         for i, theme in enumerate(top):
             acc = _ACCENTS[i]
             self._subhead(f"Addressing {theme.name}",
                           accent=acc, italic=True, sp_above=2, sp_below=1)
-            for idea in theme.action_ideas[:3]:
+            for idea in theme.action_ideas[:5]:
                 self._bullet(idea, accent=acc)
 
-        self._divider(_TEAL, sp_above=3, sp_below=2)
+        self._divider(_TEAL, sp_above=2, sp_below=2)
 
         # ── FOOTER ─────────────────────────────────────────────────────────
         ts = report.generated_at.strftime("%Y-%m-%d %H:%M:%S")
@@ -106,13 +117,21 @@ class PulseDocFormatter:
                 italic=True, color=_GRAY, size=9,
                 sp_above=0, sp_below=0, ls=100)
 
+        # Remove the trailing \n so Google Docs doesn't create a blank page 2
+        if self.idx > 1:
+            self.req.append({
+                "deleteContentRange": {
+                    "range": {"startIndex": self.idx - 1, "endIndex": self.idx}
+                }
+            })
+
         return self.req
 
     # ── element renderers ─────────────────────────────────────────────────────
 
     def _label(self, text: str, color: dict, sp_below: float):
         """Uppercase section overline — NORMAL_TEXT, bold colored."""
-        self._p(text, bold=True, color=color, size=13,
+        self._p(text, bold=True, color=color, size=14,
                 sp_above=0, sp_below=sp_below, ls=100)
 
     def _card_head(self, text: str, accent: dict):
@@ -120,9 +139,9 @@ class PulseDocFormatter:
         s = self.idx
         self._ins(text + "\n")
         e = self.idx
-        self._ts(s, e, bold=True, color=accent, size=13)
+        self._ts(s, e, bold=True, color=accent, size=12)
         self._ps(s, e,
-                 sp_above=3, sp_below=1, ls=100,
+                 sp_above=2, sp_below=1, ls=100,
                  indent=10, border_color=accent, border_pt=2.5)
 
     def _body(self, text: str, sp_below: float = 4):
@@ -130,11 +149,11 @@ class PulseDocFormatter:
         s = self.idx
         self._ins(text + "\n")
         e = self.idx
-        self._ts(s, e, color=_BODY, size=11)
-        self._ps(s, e, sp_above=1, sp_below=sp_below, ls=112, indent=12)
+        self._ts(s, e, color=_BODY, size=10)
+        self._ps(s, e, sp_above=1, sp_below=sp_below, ls=105, indent=12)
 
     def _subhead(self, text: str, accent: dict, italic=False,
-                 sp_above: float = 4, sp_below: float = 2):
+                 sp_above: float = 2, sp_below: float = 1):
         self._p(text, bold=True, italic=italic, color=accent, size=12,
                 sp_above=sp_above, sp_below=sp_below, ls=100)
 
@@ -143,7 +162,7 @@ class PulseDocFormatter:
         self._ins(f"“{text}”\n")
         e = self.idx
         self._ts(s, e, italic=True, color=_QUOTE, size=10)
-        self._ps(s, e, sp_above=0, sp_below=0, ls=105, indent=12)
+        self._ps(s, e, sp_above=0, sp_below=0, ls=100, indent=12)
 
     def _bullet(self, text: str, accent: dict):
         s = self.idx
@@ -152,10 +171,10 @@ class PulseDocFormatter:
         self._ins(text + "\n")
         e = self.idx
         if mid > s:
-            self._ts(s, mid, bold=True, color=accent, size=11)
+            self._ts(s, mid, bold=True, color=accent, size=10)
         if e > mid:
-            self._ts(mid, e, color=_BODY, size=11)
-        self._ps(s, e, sp_above=0, sp_below=0, ls=108, indent=6)
+            self._ts(mid, e, color=_BODY, size=10)
+        self._ps(s, e, sp_above=0, sp_below=0, ls=100, indent=6)
 
     def _divider(self, color: dict, sp_above: float = 4, sp_below: float = 4):
         s = self.idx
@@ -180,6 +199,8 @@ class PulseDocFormatter:
     def _ins(self, text: str):
         if not text:
             return
+        import emoji
+        text = emoji.replace_emoji(text, replace='')
         self.req.append({
             "insertText": {"location": {"index": self.idx}, "text": text}
         })

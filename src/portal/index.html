@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse Agent — Groww Review Intelligence</title>
+<style>
+  :root {
+    --bg:       #080D1A;
+    --surface:  #0D1526;
+    --card:     #111D35;
+    --card2:    #152040;
+    --border:   #1C2D4A;
+    --border2:  #243759;
+    --teal:     #00D09C;
+    --teal-dim: rgba(0,208,156,0.12);
+    --teal-glow:rgba(0,208,156,0.25);
+    --purple:   #6C63FF;
+    --purp-dim: rgba(108,99,255,0.12);
+    --purp-glow:rgba(108,99,255,0.3);
+    --amber:    #F59E0B;
+    --red:      #F87171;
+    --text:     #E2E8F0;
+    --mid:      #94A3B8;
+    --muted:    #4A5568;
+    --term-bg:  #050A12;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+    min-height: 100vh;
+    font-size: 14px;
+    background-image: radial-gradient(ellipse at 20% 0%, rgba(108,99,255,0.07) 0%, transparent 50%),
+                      radial-gradient(ellipse at 80% 0%, rgba(0,208,156,0.05) 0%, transparent 50%);
+  }
+
+  /* ══ TOP NAV ══ */
+  .topnav {
+    background: rgba(13,21,38,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 58px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; }
+  .brand-logo {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--purple), var(--teal));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+    box-shadow: 0 0 16px var(--purp-glow);
+  }
+  .brand-name { font-size: 17px; font-weight: 800; color: #fff; letter-spacing: -0.4px; }
+  .brand-name span { color: var(--teal); }
+  .brand-sub { font-size: 10px; color: var(--muted); margin-top: 1px; letter-spacing: 0.5px; }
+
+  .nav-pill {
+    font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--teal); background: var(--teal-dim);
+    padding: 4px 12px; border-radius: 20px;
+    border: 1px solid rgba(0,208,156,0.2);
+  }
+  .nav-spacer { flex: 1; }
+
+  /* Controls */
+  .ctrl-select, .ctrl-input {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); padding: 8px 14px;
+    border-radius: 8px; font-size: 13px; font-weight: 500;
+    outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .ctrl-select:focus, .ctrl-input:focus {
+    border-color: var(--purple);
+    box-shadow: 0 0 0 3px var(--purp-dim);
+  }
+  .ctrl-input { width: 120px; }
+
+  /* Run button */
+  .btn-run {
+    background: linear-gradient(135deg, var(--teal) 0%, #00B386 100%);
+    color: #fff; border: none; padding: 10px 24px;
+    border-radius: 9px; font-size: 13px; font-weight: 700;
+    cursor: pointer; display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 4px 16px var(--teal-glow);
+    transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+    white-space: nowrap;
+  }
+  .btn-run:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 24px var(--teal-glow); }
+  .btn-run:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+  .spin {
+    width: 13px; height: 13px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin 0.7s linear infinite; display: none;
+  }
+  .btn-run.running .spin     { display: block; }
+  .btn-run.running .play-ico { display: none; }
+
+  /* ══ TICKER ══ */
+  .ticker {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px; height: 40px;
+    display: flex; align-items: center; gap: 32px;
+    overflow-x: auto; font-size: 11.5px;
+  }
+  .tick-item { display: flex; align-items: center; gap: 9px; white-space: nowrap; flex-shrink: 0; }
+  .tick-label { color: var(--muted); font-weight: 600; letter-spacing: 0.5px; }
+  .tick-val { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; transition: color 0.4s; }
+  .tick-val.up   { color: var(--teal); }
+  .tick-val.down { color: var(--red); }
+  .tick-sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
+
+  /* Progress */
+  .prog-wrap { height: 2px; background: var(--border); }
+  .prog-bar  { height: 100%; width: 0%; background: linear-gradient(90deg, var(--purple), var(--teal)); transition: width 0.7s ease; }
+
+  /* ══ BODY ══ */
+  .body { padding: 24px 32px 48px; }
+
+  /* ══ PIPELINE ══ */
+  .sec-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 14px;
+  }
+  .pipeline {
+    display: flex; align-items: center; gap: 0;
+    margin-bottom: 24px; overflow-x: auto; padding-top: 12px; padding-bottom: 6px;
+  }
+
+  .phase-card {
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 16px; padding: 18px 22px;
+    min-width: 126px; flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
+    position: relative;
+  }
+  .phase-icon {
+    width: 46px; height: 46px; border-radius: 13px;
+    background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 21px; position: relative;
+    transition: background 0.3s;
+  }
+  .phase-ring {
+    position: absolute; inset: -6px; border-radius: 18px;
+    border: 2.5px solid transparent;
+    border-top-color: var(--purple);
+    animation: spin 0.9s linear infinite; display: none;
+  }
+  .phase-name  { font-size: 11px; font-weight: 700; color: var(--mid); text-align: center; line-height: 1.4; }
+  .phase-lbl   { font-size: 10px; color: var(--muted); font-weight: 600; }
+  .phase-check {
+    position: absolute; top: -8px; right: -8px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--teal); color: #fff;
+    font-size: 10px; font-weight: 900;
+    display: none; align-items: center; justify-content: center;
+    box-shadow: 0 0 12px var(--teal-glow);
+  }
+
+  /* States */
+  .phase-card.running {
+    border-color: var(--purple); transform: translateY(-3px);
+    box-shadow: 0 0 0 4px var(--purp-dim), 0 12px 32px rgba(108,99,255,0.2);
+    animation: pulse-card 1.8s ease-in-out infinite;
+  }
+  .phase-card.running .phase-ring  { display: block; }
+  .phase-card.running .phase-icon  { background: var(--purp-dim); }
+  .phase-card.running .phase-name  { color: var(--purple); }
+  .phase-card.running .phase-lbl   { color: var(--purple); }
+
+  .phase-card.done {
+    border-color: var(--teal);
+    box-shadow: 0 0 0 3px var(--teal-dim), 0 4px 16px rgba(0,208,156,0.1);
+  }
+  .phase-card.done .phase-icon  { background: var(--teal-dim); }
+  .phase-card.done .phase-name  { color: var(--teal); }
+  .phase-card.done .phase-lbl   { color: var(--teal); }
+  .phase-card.done .phase-check { display: flex; }
+
+  .phase-card.paused {
+    border-color: var(--amber);
+    box-shadow: 0 0 0 3px rgba(245,158,11,0.12), 0 4px 16px rgba(245,158,11,0.1);
+  }
+  .phase-card.paused .phase-icon  { background: rgba(245,158,11,0.12); }
+  .phase-card.paused .phase-name  { color: var(--amber); }
+  .phase-card.paused .phase-lbl   { color: var(--amber); }
+
+  .phase-card.error { border-color: var(--red); box-shadow: 0 0 0 3px rgba(248,113,113,0.1); }
+
+  /* Arrow */
+  .arrow {
+    flex-shrink: 0; width: 32px; height: 2px;
+    background: var(--border); position: relative; margin: 0 -2px;
+    transition: background 0.5s;
+  }
+  .arrow::after {
+    content: ''; position: absolute; right: -1px; top: -4px;
+    border: 5px solid transparent; border-left-color: var(--border);
+    transition: border-left-color 0.5s;
+  }
+  .arrow.lit { background: var(--teal); }
+  .arrow.lit::after { border-left-color: var(--teal); }
+
+  /* ══ MAIN GRID ══ */
+  .main-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+  }
+
+  .panel {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; overflow: hidden;
+    display: flex; flex-direction: column; height: 450px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+  .panel-hdr {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 12px 18px; display: flex; align-items: center; gap: 10px;
+    flex-shrink: 0;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-r { background: #FF5F57; } .dot-y { background: #FFBD2E; } .dot-g { background: #28C840; }
+  .panel-title { font-size: 12px; font-weight: 700; color: var(--mid); margin-left: 4px; }
+  .panel-badge {
+    margin-left: auto; font-size: 10px; font-weight: 700;
+    padding: 3px 9px; border-radius: 20px;
+    background: var(--teal-dim); color: var(--teal);
+    border: 1px solid rgba(0,208,156,0.2);
+    display: none;
+  }
+  .panel-badge.show { display: block; }
+
+  /* Terminal */
+  .term-body {
+    flex: 1; background: var(--term-bg); overflow-y: auto;
+    padding: 16px 18px;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
+    font-size: 11.5px; line-height: 1.85; color: #4A9EFF;
+  }
+  .term-body::-webkit-scrollbar { width: 4px; }
+  .term-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .log-line { animation: fadeUp 0.22s ease both; }
+  .log-ok   { color: var(--teal); }
+  .log-phase{ color: #D2A8FF; font-weight: 700; }
+  .log-dim  { color: var(--muted); }
+  .log-err  { color: var(--red); }
+  .cursor   { display: inline-block; width: 7px; height: 13px; background: var(--teal); vertical-align: text-bottom; animation: blink 1s step-end infinite; margin-left: 2px; }
+
+  /* Results */
+  .res-body {
+    flex: 1; overflow-y: auto; padding: 16px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .res-body::-webkit-scrollbar { width: 4px; }
+  .res-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Stats */
+  .stats-row { display: flex; gap: 8px; }
+  .stat-chip {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 11px 10px; text-align: center;
+    opacity: 0; transform: translateY(8px);
+    transition: opacity 0.4s, transform 0.4s;
+  }
+  .stat-chip.show { opacity: 1; transform: none; }
+  .stat-v { font-size: 20px; font-weight: 800; color: var(--text); }
+  .stat-l { font-size: 9px; color: var(--muted); margin-top: 3px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+
+  /* Section label */
+  .res-sec {
+    font-size: 9px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--muted);
+    padding-bottom: 6px; border-bottom: 1px solid var(--border);
+  }
+
+  /* Theme cards */
+  .theme-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 13px 15px;
+    border-left: 3px solid var(--purple);
+    opacity: 0; transform: translateY(8px);
+    transition: opacity 0.4s, transform 0.4s, box-shadow 0.2s;
+  }
+  .theme-card:nth-child(1) { border-left-color: var(--purple); }
+  .theme-card:nth-child(2) { border-left-color: var(--teal); }
+  .theme-card:nth-child(3) { border-left-color: var(--amber); }
+  .theme-card.show { opacity: 1; transform: none; }
+  .theme-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.3); border-color: var(--border2); }
+  .theme-num  { font-size: 9px; font-weight: 700; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+  .theme-name { font-size: 13px; font-weight: 700; color: var(--text); margin: 4px 0 5px; }
+  .theme-desc { font-size: 11px; color: var(--mid); line-height: 1.55; }
+
+  /* Delivery */
+  .delivery-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 15px;
+    display: flex; align-items: center; gap: 12px;
+    text-decoration: none; color: var(--text);
+    font-size: 12px; font-weight: 600;
+    opacity: 0; transition: opacity 0.5s, border-color 0.2s, box-shadow 0.2s;
+  }
+  .delivery-card.show { opacity: 1; }
+  .delivery-card:hover { border-color: var(--teal); box-shadow: 0 0 0 2px var(--teal-dim); }
+  .dl-ico   { font-size: 20px; }
+  .dl-label { flex: 1; }
+  .dl-badge {
+    font-size: 10px; font-weight: 700; padding: 3px 10px;
+    border-radius: 20px; background: var(--border); color: var(--muted);
+    transition: all 0.3s;
+  }
+  .dl-badge.ok { background: var(--teal-dim); color: var(--teal); border: 1px solid rgba(0,208,156,0.25); }
+
+  /* Idle */
+  .idle-state {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100%;
+    gap: 14px; text-align: center;
+  }
+  .idle-icon {
+    width: 72px; height: 72px; border-radius: 20px;
+    background: linear-gradient(135deg, var(--purp-dim), var(--teal-dim));
+    border: 1px solid var(--border2);
+    display: flex; align-items: center; justify-content: center; font-size: 32px;
+  }
+  .idle-state h3 { font-size: 15px; font-weight: 700; color: var(--text); }
+  .idle-state p  { font-size: 12px; color: var(--muted); line-height: 1.6; max-width: 200px; }
+
+  /* Done banner */
+  .done-banner {
+    background: linear-gradient(135deg, rgba(0,208,156,0.1), rgba(108,99,255,0.1));
+    border: 1px solid rgba(0,208,156,0.25); border-radius: 12px;
+    padding: 14px; font-size: 13px; font-weight: 700; color: var(--teal);
+    text-align: center; animation: fadeUp 0.5s ease both;
+  }
+
+  /* ══ ANIMATIONS ══ */
+  @keyframes spin  { to { transform: rotate(360deg); } }
+  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulse-card {
+    0%,100% { box-shadow: 0 0 0 4px var(--purp-dim), 0 8px 24px rgba(108,99,255,0.15); }
+    50%      { box-shadow: 0 0 0 6px rgba(108,99,255,0.18), 0 12px 32px rgba(108,99,255,0.28); }
+  }
+
+  /* ══ RESPONSIVE ══ */
+  @media (max-width: 860px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .body { padding: 16px; }
+    .topnav,.ticker { padding: 0 16px; }
+    .arrow { width: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ NAV ══ -->
+<nav class="topnav">
+  <div class="brand">
+    <div class="brand-logo">🤖</div>
+    <div>
+      <div class="brand-name">Pulse-Agent</div>
+      <div class="brand-sub">Review Intelligence Pipeline</div>
+    </div>
+  </div>
+  <span class="nav-pill">AI Agent</span>
+  <div class="nav-spacer"></div>
+
+  <select class="ctrl-select" id="product">
+    <option value="Groww">Groww</option>
+    <option value="INDMoney">INDMoney</option>
+    <option value="Kuvera">Kuvera</option>
+    <option value="PowerUp Money">PowerUp Money</option>
+    <option value="Wealth Monitor">Wealth Monitor</option>
+  </select>
+
+  <input class="ctrl-input" id="week" type="text" value="2026-W17" placeholder="2026-W17">
+
+  <button class="btn-run" id="btnRun" onclick="startRun()">
+    <div class="spin"></div>
+    <span class="play-ico">▶ &nbsp;Run Agent</span>
+  </button>
+</nav>
+
+<!-- ══ TICKER ══ -->
+<div class="ticker">
+  <div class="tick-item"><span class="tick-label">REVIEWS</span><span class="tick-val" id="tk-reviews">—</span></div>
+  <div class="tick-sep"></div>
+  <div class="tick-item"><span class="tick-label">CLUSTERS</span><span class="tick-val" id="tk-clusters">—</span></div>
+  <div class="tick-sep"></div>
+  <div class="tick-item"><span class="tick-label">THEMES</span><span class="tick-val" id="tk-themes">—</span></div>
+  <div class="tick-sep"></div>
+  <div class="tick-item"><span class="tick-label">TOKENS</span><span class="tick-val" id="tk-tokens">—</span></div>
+  <div class="tick-sep"></div>
+  <div class="tick-item"><span class="tick-label">STATUS</span><span class="tick-val" id="tk-status">Idle</span></div>
+</div>
+<div class="prog-wrap"><div class="prog-bar" id="progressBar"></div></div>
+
+<!-- ══ BODY ══ -->
+<div class="body">
+
+  <!-- Pipeline -->
+  <div class="sec-label" style="margin-top:8px;">Pipeline Flow</div>
+  <div class="pipeline">
+
+    <div class="phase-card" id="pc-scrape">
+      <div class="phase-icon"><div class="phase-ring"></div>📥</div>
+      <div class="phase-name">Scrape<br>Reviews</div>
+      <div class="phase-lbl" id="pl-scrape">Idle</div>
+      <div class="phase-check">✓</div>
+    </div>
+    <div class="arrow" id="ar-0"></div>
+
+    <div class="phase-card" id="pc-cluster">
+      <div class="phase-icon"><div class="phase-ring"></div>🔵</div>
+      <div class="phase-name">Cluster</div>
+      <div class="phase-lbl" id="pl-cluster">Idle</div>
+      <div class="phase-check">✓</div>
+    </div>
+    <div class="arrow" id="ar-1"></div>
+
+    <div class="phase-card" id="pc-summarize">
+      <div class="phase-icon"><div class="phase-ring"></div>🧠</div>
+      <div class="phase-name">Summarize</div>
+      <div class="phase-lbl" id="pl-summarize">Idle</div>
+      <div class="phase-check">✓</div>
+    </div>
+    <div class="arrow" id="ar-2"></div>
+
+    <div class="phase-card" id="pc-render">
+      <div class="phase-icon"><div class="phase-ring"></div>📄</div>
+      <div class="phase-name">Render<br>Report</div>
+      <div class="phase-lbl" id="pl-render">Idle</div>
+      <div class="phase-check">✓</div>
+    </div>
+    <div class="arrow" id="ar-3"></div>
+
+    <div class="phase-card" id="pc-docs">
+      <div class="phase-icon"><div class="phase-ring"></div>📝</div>
+      <div class="phase-name">Publish<br>to Docs</div>
+      <div class="phase-lbl" id="pl-docs">Idle</div>
+      <div class="phase-check">✓</div>
+    </div>
+    <div class="arrow" id="ar-4"></div>
+
+    <div class="phase-card" id="pc-email">
+      <div class="phase-icon"><div class="phase-ring"></div>✉️</div>
+      <div class="phase-name">Send<br>Email</div>
+      <div class="phase-lbl" id="pl-email">Idle</div>
+      <div class="phase-check">✓</div>
+    </div>
+
+  </div>
+
+  <!-- Main -->
+  <div class="main-grid">
+
+    <!-- Terminal -->
+    <div class="panel">
+      <div class="panel-hdr">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <span class="panel-title">Terminal — pulse-agent</span>
+        <span class="panel-badge" id="termBadge">● Live</span>
+      </div>
+      <div class="term-body" id="terminal">
+        <div class="log-line log-dim">$ PYTHONPATH=. python -m src.phase7_orchestration.agent --product Groww<span class="cursor"></span></div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="panel">
+      <div class="panel-hdr">
+        <span style="font-size:16px">📊</span>
+        <span class="panel-title">Analysis Results</span>
+        <span class="panel-badge" id="resBadge">Complete</span>
+      </div>
+      <div class="res-body" id="results">
+        <div class="idle-state">
+          <div class="idle-icon">🤖</div>
+          <h3>Ready to analyse</h3>
+          <p>Click <strong>Run Agent</strong> to start the full pipeline. Themes appear here live.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const PHASES = ['scrape','cluster','summarize','render','docs','email'];
+const PROG   = {scrape:14, cluster:30, summarize:56, render:68, docs:84, email:100};
+let evtSource = null, _statRow = null, _delivRow = null;
+let _emailPaused = false;  // tracks whether email is in paused/draft state
+
+function setPhase(p, state, lbl) {
+  const c = document.getElementById('pc-' + p);
+  c.classList.remove('running','done','error','paused');
+  if (state) c.classList.add(state);
+  const l = document.getElementById('pl-' + p);
+  if (l) l.textContent = lbl || (state==='done'?'Done ✓' : state==='running'?'Running…' : state==='paused'?'Drafted ✎' : 'Idle');
+}
+function litArrow(i) { const a = document.getElementById('ar-'+i); if(a) a.classList.add('lit'); }
+function setProg(p)  { document.getElementById('progressBar').style.width = p + '%'; }
+function setTick(id, v, cls) {
+  const el = document.getElementById('tk-' + id);
+  if (!el) return;
+  el.textContent = v;
+  el.className = 'tick-val' + (cls ? ' ' + cls : '');
+}
+
+function log(msg) {
+  const t = document.getElementById('terminal');
+  const d = document.createElement('div');
+  d.className = 'log-line';
+  const m = msg.trim();
+  if (m.startsWith('[') && m.includes('/6]')) d.classList.add('log-phase');
+  else if (m.includes('✓') || m.includes('sent') || m.includes('success')) d.classList.add('log-ok');
+  else if (m.startsWith('[ERROR]') || m.includes('ERROR')) d.classList.add('log-err');
+  d.textContent = msg;
+  t.appendChild(d);
+  t.scrollTop = t.scrollHeight;
+}
+
+function startRun() {
+  const product = document.getElementById('product').value;
+  const week    = document.getElementById('week').value;
+  const btn     = document.getElementById('btnRun');
+
+  // Reset
+  PHASES.forEach(p => setPhase(p, '', 'Idle'));
+  for (let i = 0; i < 5; i++) { const a = document.getElementById('ar-'+i); if(a) a.classList.remove('lit'); }
+  setProg(0);
+  ['reviews','clusters','themes','tokens'].forEach(k => setTick(k,'—'));
+  setTick('status','Running…','up');
+  document.getElementById('terminal').innerHTML = '';
+  document.getElementById('results').innerHTML  = '<div class="idle-state"><div class="idle-icon">⚡</div><h3>Starting…</h3></div>';
+  document.getElementById('termBadge').classList.add('show');
+  document.getElementById('resBadge').classList.remove('show');
+  _statRow = null; _delivRow = null; _emailPaused = false;
+
+  btn.classList.add('running'); btn.disabled = true;
+  if (evtSource) evtSource.close();
+
+  fetch('/run', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({product, week})
+  })
+  .then(r => r.json())
+  .then(({run_id}) => {
+    evtSource = new EventSource('/stream/' + run_id);
+    evtSource.onmessage = e => handle(JSON.parse(e.data));
+    evtSource.onerror   = () => { log('[connection lost]'); finish(); };
+  });
+}
+
+function handle(ev) {
+  if (ev.type === 'ping') return;
+
+  if (ev.type === 'phase_start') {
+    setPhase(ev.phase, 'running');
+    setProg(PROG[ev.phase] - 12);
+  }
+
+  if (ev.type === 'phase_done') {
+    const idx = PHASES.indexOf(ev.phase);
+    setPhase(ev.phase, 'done');
+    if (idx >= 0 && idx < 5) litArrow(idx);
+    setProg(PROG[ev.phase]);
+    const d = ev.data || {};
+    if (d.review_count) { setTick('reviews', d.review_count.toLocaleString(), 'up'); showStat('reviews', d.review_count.toLocaleString(), 'Reviews'); }
+    if (d.cluster_count){ setTick('clusters', d.cluster_count, 'up'); showStat('clusters', d.cluster_count, 'Clusters'); }
+    if (d.theme_count)  { setTick('themes', d.theme_count, 'up'); showStat('themes', d.theme_count, 'Themes'); }
+    if (d.tokens_used)  { setTick('tokens', (d.tokens_used/1000).toFixed(1)+'k'); showStat('tokens', (d.tokens_used/1000).toFixed(1)+'k', 'Tokens'); }
+    if (d.doc_url)  updateDelivery('doc', d.doc_url, 'Live ↗', true);
+    // Do NOT auto-mark email as 'Sent' here — that only happens after user clicks Send
+  }
+
+  // Email step paused — show as 'Drafted', not 'Done'
+  if (ev.type === 'phase_paused') {
+    setPhase(ev.phase, 'paused', 'Drafted ✎');
+    _emailPaused = true;
+    setProg(92);  // almost done, but not 100%
+  }
+
+  // Agent subprocess ended with email awaiting manual send
+  if (ev.type === 'awaiting_send') {
+    setTick('status', 'Awaiting Send', 'up');
+  }
+
+  if (ev.type === 'log')    log(ev.message);
+  if (ev.type === 'result') showResult(ev);
+  if (ev.type === 'done') {
+    finish();
+    if (_emailPaused) {
+      // Don't mark as Complete — email still needs to be sent
+      setTick('status', 'Awaiting Send', 'up');
+    } else {
+      setTick('status', 'Complete', 'up');
+      document.getElementById('resBadge').classList.add('show');
+    }
+  }
+  if (ev.type === 'fatal')  { log('[ERROR] ' + ev.message); finish(); setTick('status','Failed','down'); }
+}
+
+function finish() {
+  document.getElementById('btnRun').classList.remove('running');
+  document.getElementById('btnRun').disabled = false;
+  document.getElementById('termBadge').classList.remove('show');
+  if (evtSource) evtSource.close();
+}
+
+function ensureOpen() {
+  const r = document.getElementById('results');
+  const idle = r.querySelector('.idle-state');
+  if (idle) idle.remove();
+  return r;
+}
+
+function showStat(key, val, label) {
+  const r = ensureOpen();
+  if (!_statRow) {
+    _statRow = document.createElement('div');
+    _statRow.className = 'stats-row';
+    _statRow.innerHTML = `
+      <div class="stat-chip" id="sc-reviews"><div class="stat-v">—</div><div class="stat-l">Reviews</div></div>
+      <div class="stat-chip" id="sc-clusters"><div class="stat-v">—</div><div class="stat-l">Clusters</div></div>
+      <div class="stat-chip" id="sc-themes"><div class="stat-v">—</div><div class="stat-l">Themes</div></div>
+      <div class="stat-chip" id="sc-tokens"><div class="stat-v">—</div><div class="stat-l">Tokens</div></div>
+    `;
+    r.prepend(_statRow);
+  }
+  const sc = document.getElementById('sc-' + key);
+  if (sc) {
+    sc.querySelector('.stat-v').textContent = val;
+    sc.querySelector('.stat-l').textContent = label;
+    setTimeout(() => sc.classList.add('show'), 50);
+  }
+}
+
+function updateDelivery(key, url, txt, ok) {
+  const r = ensureOpen();
+  if (!_delivRow) {
+    _delivRow = document.createElement('div');
+    _delivRow.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+    _delivRow.innerHTML = `
+      <div class="res-sec">Delivery</div>
+      <a class="delivery-card" id="dc-doc" href="#" target="_blank">
+        <span class="dl-ico">📄</span><span class="dl-label">Google Doc</span>
+        <span class="dl-badge" id="db-doc">Pending</span>
+      </a>
+      <div class="delivery-card" id="dc-email">
+        <span class="dl-ico">✉️</span><span class="dl-label">Email Teaser</span>
+        <span class="dl-badge" id="db-email">Pending</span>
+      </div>
+    `;
+    r.appendChild(_delivRow);
+    
+    // Auto-restore doc status if we already received it from [RESULT_JSON]
+    if (window._lastDocUrl) {
+      document.getElementById('dc-doc').href = window._lastDocUrl;
+      const b = document.getElementById('db-doc');
+      b.textContent = 'Live ↗';
+      b.classList.add('ok');
+    }
+    
+    setTimeout(() => _delivRow.querySelectorAll('.delivery-card').forEach(el => el.classList.add('show')), 80);
+  }
+  if (url) { const el = document.getElementById('dc-' + key); if (el) el.href = url; }
+  const b = document.getElementById('db-' + key);
+  if (b) { b.textContent = txt; if (ok) b.classList.add('ok'); }
+}
+
+function showResult(ev) {
+  if (ev.doc_url) window._lastDocUrl = ev.doc_url;
+  if (ev.email_html) {
+    window._draftHtml   = ev.email_html;
+    window._draftSubject = ev.email_subject;
+  }
+
+  const r = ensureOpen();
+  r.querySelectorAll('.theme-card,.done-banner,.res-sec.th,.email-send-section').forEach(el => el.remove());
+
+  const sh = document.createElement('div');
+  sh.className = 'res-sec th'; sh.textContent = 'Top Themes';
+  r.appendChild(sh);
+
+  (ev.themes || []).slice(0, 3).forEach((th, i) => {
+    const c = document.createElement('div');
+    c.className = 'theme-card';
+    c.innerHTML = `<div class="theme-num">Theme ${String(i+1).padStart(2,'0')}</div>
+      <div class="theme-name">${th.name}</div>
+      <div class="theme-desc">${th.description}</div>`;
+    r.appendChild(c);
+    setTimeout(() => c.classList.add('show'), 80 + i * 130);
+  });
+
+  const b = document.createElement('div');
+  b.className = 'done-banner';
+  b.textContent = `✓ ${ev.product} ${ev.week} — ${(ev.review_count||0).toLocaleString()} reviews processed`;
+  r.appendChild(b);
+
+  // ── Inline email preview + Send button ───────────────────────────────────
+  if (ev.email_html) {
+    const sec = document.createElement('div');
+    sec.className = 'email-send-section';
+    sec.innerHTML = `
+      <div class="res-sec" style="margin-top:22px;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:18px;">✉️</span> Email Draft — Review &amp; Send
+      </div>
+      <div style="background:#0D1526;border:1px solid #1C2D4A;border-radius:10px;
+                  padding:12px 16px;margin-bottom:12px;">
+        <div style="color:#94A3B8;font-size:10px;text-transform:uppercase;
+                    letter-spacing:1.2px;margin-bottom:4px;">Subject</div>
+        <div style="color:#E2E8F0;font-weight:600;font-size:13px;">${ev.email_subject || '(no subject)'}</div>
+      </div>
+      <div style="border-radius:10px;overflow:hidden;height:340px;
+                  margin-bottom:14px;border:1px solid #1C2D4A;">
+        <iframe id="email-preview-frame"
+                style="width:100%;height:100%;border:none;"
+                title="Email Preview"></iframe>
+      </div>
+      <button id="btn-send-inline" onclick="sendEmailInline()"
+        style="width:100%;padding:15px;background:var(--teal);color:#fff;border:none;
+               border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;
+               letter-spacing:0.4px;box-shadow:0 4px 18px rgba(0,208,156,0.35);
+               transition:opacity .2s;">
+        Send Email 🚀
+      </button>
+    `;
+    r.appendChild(sec);
+
+    // Write email HTML into the sandboxed iframe
+    setTimeout(() => {
+      const f = document.getElementById('email-preview-frame');
+      if (f && f.contentDocument) {
+        f.contentDocument.open();
+        f.contentDocument.write(ev.email_html);
+        f.contentDocument.close();
+      }
+      setTimeout(() => sec.style.opacity = '1', 50);
+    }, 200);
+
+    sec.style.opacity = '0';
+    sec.style.transition = 'opacity .4s';
+  }
+
+  _statRow = null; _delivRow = null;
+}
+
+async function sendEmailInline() {
+  const btn = document.getElementById('btn-send-inline');
+  btn.textContent = 'Sending…';
+  btn.disabled = true;
+  btn.style.opacity = '0.7';
+
+  try {
+    const res = await fetch('/send_email_direct', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({subject: window._draftSubject, html: window._draftHtml})
+    });
+    const data = await res.json();
+
+    if (data.status === 'ok' || data.status === 'sent') {
+      btn.textContent = '✓ Email Sent!';
+      btn.style.background = 'var(--purple)';
+      btn.style.boxShadow = '0 4px 18px rgba(108,99,255,0.35)';
+      btn.style.opacity = '1';
+
+      // Mark email phase card as Done
+      setPhase('email', 'done', 'Done ✓');
+      setProg(100);
+
+      // Update overall status
+      _emailPaused = false;
+      setTick('status', 'Complete', 'up');
+      document.getElementById('resBadge').classList.add('show');
+
+      log('[✓] Email sent successfully!');
+    } else {
+      alert('Failed to send: ' + (data.message || 'Unknown error'));
+      btn.textContent = 'Send Email 🚀';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+    }
+  } catch (err) {
+    alert('Network error: ' + err.message);
+    btn.textContent = 'Send Email 🚀';
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }
+}
+</script>
+
+
+</body>
+</html>

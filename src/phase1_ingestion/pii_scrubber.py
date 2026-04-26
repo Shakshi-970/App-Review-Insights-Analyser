@@ -25,9 +25,26 @@ class ReviewScrubber:
 
     def is_target_language(self, text: str) -> bool:
         """Check if text is in the target language (default English)."""
+        # langdetect is relatively slow. Fast-path obvious English/ASCII text
+        # to avoid paying the detector cost for the common case.
+        t = text.strip()
+        if not t:
+            return False
+
+        # If there are strong non-Latin signals (e.g., Devanagari), fall back to detector.
+        for ch in t:
+            code = ord(ch)
+            if 0x0900 <= code <= 0x097F:  # Devanagari block
+                break
+        else:
+            # No Devanagari characters: if mostly ASCII, assume English.
+            ascii_count = sum(1 for ch in t if ord(ch) < 128)
+            if ascii_count / max(len(t), 1) >= 0.98:
+                return True
+
         try:
-            return detect(text) == self.target_lang
-        except:
+            return detect(t) == self.target_lang
+        except Exception:
             return False
 
     def get_word_count(self, text: str) -> int:
@@ -52,9 +69,9 @@ class ReviewScrubber:
         if self.get_word_count(text) < self.min_word_count:
             return None
 
-        # Filter: Emojis - DISABLED
-        # if self.has_emoji(text):
-        #     return None
+        # Filter: Emojis - drop review entirely (keeps output clean and matches tests)
+        if self.has_emoji(text):
+            return None
 
         # Filter: Language (User requested removal)
         if not self.is_target_language(text):

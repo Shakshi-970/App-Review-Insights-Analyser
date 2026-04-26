@@ -17,67 +17,94 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from groq import Groq, RateLimitError
+from groq import RateLimitError
 
 from src.phase0_foundations.config import settings
 from src.phase0_foundations.models import PulseReport, RunRecord
 from src.phase0_foundations.run_log import RunLog
-
-from src.phase1_ingestion.appstore_scraper import AppStoreScraper
-from src.phase1_ingestion.playstore_scraper import PlayStoreScraper
-
-from src.phase2_clustering.clusterer import Clusterer
-from src.phase2_clustering.embedder import Embedder
-
-from src.phase3_summarization.synthesizer import Synthesizer
-
-from src.phase4_renderer.doc_renderer import DocRenderer
-from src.phase4_renderer.email_renderer import EmailRenderer
-
-from src.phase5_docs_mcp.docs_client import DocsClient
-from src.phase6_gmail_mcp.gmail_client import GmailClient
-
-from src.phase7_orchestration.tool_registry import TOOL_SCHEMAS
 
 logger = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
 _TRANSIENT = (RateLimitError, ConnectionError, TimeoutError, OSError)
 
-_SYSTEM_PROMPT = (
-    "You are an orchestration agent for a product-review pulse pipeline. "
-    "Call the six tools in order to complete the full run:\n"
-    "1. scrape_reviews\n"
-    "2. cluster_reviews\n"
-    "3. summarize_clusters\n"
-    "4. render_report\n"
-    "5. publish_to_docs\n"
-    "6. send_email\n\n"
-    "After all tools succeed, reply with a one-sentence confirmation. "
-    "If a tool returns an error, stop immediately and report the failure."
-)
-
 
 class ProductReviewAgent:
-    def __init__(self):
+    def __init__(self, clear_doc: bool = False, pause_email: bool = False):
+        print("[*] Initializing agent (lightweight)...")
         self._run_log = RunLog()
-        self._groq = Groq(api_key=settings.GROQ_API_KEY)
-        self._embedder = Embedder()
-        self._clusterer = Clusterer()
-        self._synthesizer = Synthesizer()
-        self._doc_renderer = DocRenderer()
-        self._email_renderer = EmailRenderer()
-        self._docs_client = DocsClient()
-        self._gmail_client = GmailClient()
+        self._clear_doc = clear_doc
+        self._pause_email = pause_email
         self._state: Dict[str, Any] = {}
+
+        # Lazy-loaded — heavy objects deferred until first use
+        self._embedder = None
+        self._clusterer = None
+        self._synthesizer = None
+        self._doc_renderer = None
+        self._email_renderer = None
+        self._docs_client = None
+        self._gmail_client = None
+
+    # ── lazy loaders ──────────────────────────────────────────────────────────
+
+    @property
+    def embedder(self):
+        if self._embedder is None:
+            from src.phase2_clustering.embedder import Embedder
+            self._embedder = Embedder()
+        return self._embedder
+
+    @property
+    def clusterer(self):
+        if self._clusterer is None:
+            from src.phase2_clustering.clusterer import Clusterer
+            self._clusterer = Clusterer()
+        return self._clusterer
+
+    @property
+    def synthesizer(self):
+        if self._synthesizer is None:
+            from src.phase3_summarization.synthesizer import Synthesizer
+            self._synthesizer = Synthesizer()
+        return self._synthesizer
+
+    @property
+    def doc_renderer(self):
+        if self._doc_renderer is None:
+            from src.phase4_renderer.doc_renderer import DocRenderer
+            self._doc_renderer = DocRenderer()
+        return self._doc_renderer
+
+    @property
+    def email_renderer(self):
+        if self._email_renderer is None:
+            from src.phase4_renderer.email_renderer import EmailRenderer
+            self._email_renderer = EmailRenderer()
+        return self._email_renderer
+
+    @property
+    def docs_client(self):
+        if self._docs_client is None:
+            from src.phase5_docs_mcp.docs_client import DocsClient
+            self._docs_client = DocsClient()
+        return self._docs_client
+
+    @property
+    def gmail_client(self):
+        if self._gmail_client is None:
+            from src.phase6_gmail_mcp.gmail_client import GmailClient
+            self._gmail_client = GmailClient()
+        return self._gmail_client
 
     # ── public API ─────────────────────────────────────────────────────────────
 
-    def run_pulse(self, product: str, iso_week: Optional[str] = None) -> RunRecord:
+    def run_pulse(self, product: str, iso_week: Optional[str] = None, force: bool = False) -> RunRecord:
+        print(f"[*] Pulse Agent starting for {product}...")
         if not iso_week:
             iso_week = datetime.now().strftime("%G-W%V")
 
-        if self._run_log.exists(product, iso_week):
+        if not force and self._run_log.exists(product, iso_week):
             logger.info("Run for %s %s already succeeded — skipping.", product, iso_week)
             return self._run_log.get_run(product, iso_week)
 
@@ -94,10 +121,32 @@ class ProductReviewAgent:
 
         try:
             self._agent_loop(product, iso_week, run_record)
-            run_record.status = "success"
-            run_record.completed_at = datetime.now()
-            run_record.token_usage = self._synthesizer.total_tokens_used
-            print(f"[*] Run {run_id} completed successfully.")
+
+            # Output final result as JSON for the portal
+            result_data = {
+                "type": "result",
+                "product": product,
+                "week": iso_week,
+                "review_count": run_record.review_count,
+                "token_usage": run_record.token_usage,
+                "doc_url": self._state.get("doc_url"),
+                "email_html": self._state.get("email_html"),
+                "email_subject": self._state.get("email_subject"),
+                "themes": [t.model_dump() for t in self._state.get("themes", [])]
+            }
+            print(f"\n[RESULT_JSON] {json.dumps(result_data)}")
+
+            # If email was paused, mark as pending_email — NOT success
+            if self._pause_email:
+                run_record.status = "pending_email"
+                run_record.completed_at = datetime.now()
+                run_record.token_usage = self.synthesizer.total_tokens_used
+                print(f"[*] Run {run_id} awaiting email approval.")
+            else:
+                run_record.status = "success"
+                run_record.completed_at = datetime.now()
+                run_record.token_usage = self.synthesizer.total_tokens_used
+                print(f"[*] Run {run_id} completed successfully.")
         except Exception as e:
             logger.error("Run %s failed: %s", run_id, e)
             run_record.status = "failed"
@@ -110,67 +159,27 @@ class ProductReviewAgent:
     # ── agent loop ─────────────────────────────────────────────────────────────
 
     def _agent_loop(self, product: str, iso_week: str, run_record: RunRecord):
-        messages: List[Dict] = [
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": (
-                    f"Run the full pulse pipeline for product='{product}', "
-                    f"iso_week='{iso_week}'."
-                ),
-            },
+        # Pipeline always runs in fixed order — no LLM needed for routing.
+        # This reserves all TPM budget for the synthesizer (the only phase
+        # that actually needs an LLM).
+        pipeline = [
+            ("scrape_reviews",    {"product": product, "iso_week": iso_week}),
+            ("cluster_reviews",   {}),
+            ("summarize_clusters",{}),
+            ("render_report",     {}),
+            ("publish_to_docs",   {}),
+            ("send_email",        {}),
         ]
-
-        while True:
-            response = self._groq.chat.completions.create(
-                model=settings.DEFAULT_MODEL,
-                messages=messages,
-                tools=TOOL_SCHEMAS,
-                tool_choice="auto",
-                temperature=0,
-            )
-            msg = response.choices[0].message
-
-            # Append assistant turn
-            assistant_entry: Dict[str, Any] = {"role": "assistant", "content": msg.content}
-            if msg.tool_calls:
-                assistant_entry["tool_calls"] = [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments,
-                        },
-                    }
-                    for tc in msg.tool_calls
-                ]
-            messages.append(assistant_entry)
-
-            if not msg.tool_calls:
-                logger.info("Agent loop finished: %s", msg.content)
-                break
-
-            for tool_call in msg.tool_calls:
-                name = tool_call.function.name
-                args = json.loads(tool_call.function.arguments or "{}")
-                logger.info("Tool call: %s %s", name, args)
-
-                try:
-                    result = self._with_retry(self._execute_tool, name, args, run_record)
-                except Exception as e:
-                    result = {"status": "error", "message": str(e)}
-                    logger.error("Tool %s raised: %s", name, e)
-
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": json.dumps(result),
-                    }
-                )
-
-                if result.get("status") == "error":
+        for name, args in pipeline:
+            logger.info("Running tool: %s", name)
+            t0 = time.time()
+            result = self._with_retry(self._execute_tool, name, args, run_record)
+            print(f"      [timing] {name} took {time.time() - t0:.1f}s")
+            if result.get("status") == "error":
+                if name == "send_email":
+                    # Email failure is non-fatal — doc was already published
+                    print(f"      [!] Email skipped: {result.get('message', 'unknown error')}")
+                else:
                     raise RuntimeError(
                         f"Tool '{name}' failed: {result.get('message', result)}"
                     )
@@ -214,7 +223,13 @@ class ProductReviewAgent:
 
     def _tool_scrape(self, product: str, iso_week: str, run_record: RunRecord) -> dict:
         print(f"[1/6] Scraping reviews for {product} ({iso_week})...")
-        reviews = AppStoreScraper().fetch_reviews(product) + PlayStoreScraper().fetch_reviews(product)
+        from concurrent.futures import ThreadPoolExecutor
+        from src.phase1_ingestion.appstore_scraper import AppStoreScraper
+        from src.phase1_ingestion.playstore_scraper import PlayStoreScraper
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            f_app  = ex.submit(AppStoreScraper().fetch_reviews, product)
+            f_play = ex.submit(PlayStoreScraper().fetch_reviews, product)
+            reviews = f_app.result() + f_play.result()
         if not reviews:
             return {"status": "error", "message": f"No reviews found for {product}"}
         self._state["reviews"] = reviews
@@ -225,19 +240,35 @@ class ProductReviewAgent:
     def _tool_cluster(self) -> dict:
         print("[2/6] Clustering reviews...")
         reviews = self._state["reviews"]
-        embeddings = self._embedder.embed([r.text for r in reviews])
-        clusters = self._clusterer.cluster(embeddings, reviews)
+        sample_size = settings.CLUSTERING_SAMPLE_SIZE
+        if len(reviews) > sample_size:
+            import random
+            reviews = random.sample(reviews, sample_size)
+            print(f"      Sampled {sample_size} of {len(self._state['reviews'])} reviews for clustering.")
+
+        n = len(reviews)
+        print(f"      Step 1/3 — Embedding {n} reviews with {self.embedder.MODEL_NAME}...")
+        t_embed = time.time()
+        embeddings = self.embedder.embed([r.text for r in reviews])
+        print(f"      Step 1/3 done — embeddings shape {embeddings.shape} in {time.time() - t_embed:.1f}s.")
+
+        print(f"      Step 2/3 — Running UMAP + HDBSCAN...")
+        t_cluster = time.time()
+        clusters = self.clusterer.cluster(embeddings, reviews)
+        print(f"      Step 2/3 done — {len(clusters)} clusters in {time.time() - t_cluster:.1f}s.")
+
         self._state["clusters"] = clusters
-        print(f"      {len(clusters)} clusters found.")
+        sizes = sorted([len(c.reviews) for c in clusters], reverse=True)
+        print(f"      Step 3/3 — Cluster sizes: {sizes}")
         return {"status": "ok", "cluster_count": len(clusters)}
 
     def _tool_summarize(self, run_record: RunRecord) -> dict:
         print("[3/6] Summarizing clusters...")
-        themes = self._synthesizer.synthesize_clusters(
+        themes = self.synthesizer.synthesize_clusters(
             run_record.product, self._state["clusters"]
         )
         self._state["themes"] = themes
-        run_record.token_usage = self._synthesizer.total_tokens_used
+        run_record.token_usage = self.synthesizer.total_tokens_used
         print(f"      {len(themes)} themes extracted. Tokens: {run_record.token_usage}")
         return {"status": "ok", "theme_count": len(themes)}
 
@@ -251,7 +282,7 @@ class ProductReviewAgent:
             themes=self._state["themes"],
         )
         self._state["report"] = report
-        self._state["anchor"] = self._doc_renderer.generate_anchor(
+        self._state["anchor"] = self.doc_renderer.generate_anchor(
             run_record.product, run_record.iso_week
         )
         return {"status": "ok", "theme_count": len(report.themes)}
@@ -263,7 +294,11 @@ class ProductReviewAgent:
             print("      GOOGLE_DOCS_ID not set — skipping.")
             return {"status": "skipped", "reason": "GOOGLE_DOCS_ID not configured"}
 
-        result = self._docs_client.run_append_report(
+        if self._clear_doc:
+            print("      Clearing existing document content...")
+            self.docs_client.run_clear_document(doc_id)
+
+        result = self.docs_client.run_append_report(
             doc_id,
             self._state["report"],
             self._state["anchor"],
@@ -285,7 +320,7 @@ class ProductReviewAgent:
         return {"status": result.get("status", "ok"), "doc_url": doc_url}
 
     def _tool_email(self, run_record: RunRecord) -> dict:
-        print("[6/6] Sending teaser email...")
+        print("[6/6] Rendering teaser email...")
         recipient = settings.RECIPIENT_EMAIL
         if not recipient:
             print("      RECIPIENT_EMAIL not set — skipping.")
@@ -293,10 +328,20 @@ class ProductReviewAgent:
 
         doc_url = self._state.get("doc_url", "#")
         report = self._state["report"]
-        email_html = self._email_renderer.render(report, doc_url)
+        email_html = self.email_renderer.render(report, doc_url)
         subject = f"Pulse Report: {report.product} {report.iso_week}"
+        
+        self._state["email_html"] = email_html
+        self._state["email_subject"] = subject
 
-        result = self._gmail_client.run_send_teaser(recipient, subject, email_html)
+        if getattr(self, "_pause_email", False):
+            print("      [!] --pause-email flag set. Email drafted but NOT sent.")
+            # Return "paused" status — NOT "ok" — so the portal knows
+            # this step is awaiting manual approval
+            return {"status": "paused", "recipient": recipient, "draft": True}
+
+        print("      Sending teaser email...")
+        result = self.gmail_client.run_send_teaser(recipient, subject, email_html)
 
         if result.get("status") == "error":
             return {
@@ -340,9 +385,24 @@ def main():
         action="store_true",
         help="Run for all missing weeks in the rolling window",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Bypass idempotency check and re-run even if a successful record exists",
+    )
+    parser.add_argument(
+        "--clear-doc",
+        action="store_true",
+        help="Clear the Google Doc before appending the new report",
+    )
+    parser.add_argument(
+        "--pause-email",
+        action="store_true",
+        help="Draft the email but do not send it automatically",
+    )
     args = parser.parse_args()
 
-    agent = ProductReviewAgent()
+    agent = ProductReviewAgent(clear_doc=args.clear_doc, pause_email=args.pause_email)
 
     if args.backfill:
         weeks = _rolling_weeks(settings.ROLLING_WINDOW_WEEKS)
@@ -351,11 +411,11 @@ def main():
         for week in missing:
             print(f"\n=== {args.product} {week} ===")
             try:
-                agent.run_pulse(args.product, week)
+                agent.run_pulse(args.product, week, force=args.force)
             except Exception as exc:
                 logger.error("Backfill failed for %s %s: %s", args.product, week, exc)
     else:
-        agent.run_pulse(args.product, args.week)
+        agent.run_pulse(args.product, args.week, force=args.force)
 
 
 if __name__ == "__main__":

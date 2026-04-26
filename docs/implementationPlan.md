@@ -33,7 +33,7 @@ This plan maps each phase to concrete tasks, files to create, dependencies, and 
 |---|------|---------|---------|
 | 1.1 | App Store scraper | `appstore_scraper.py` | Parse iTunes RSS XML; extract review_id, rating, title, text, date; handle pagination |
 | 1.2 | Play Store scraper | `playstore_scraper.py` | Use `google-play-scraper` or Playwright; extract same fields; handle continuation tokens |
-| 1.3 | PII scrubber | `pii_scrubber.py` | Regex patterns for emails, phones, Aadhaar-like IDs; preserve `original_text` before scrubbing |
+| 1.3 | PII scrubber | `pii_scrubber.py` | Regex patterns for emails, phones, Aadhaar-like IDs; preserve `original_text` before scrubbing; strip emojis from scraped data |
 | 1.4 | Deduplication | In scrapers | Deduplicate by `review_id` across runs |
 | 1.5 | Rolling window filter | In scrapers | Only return reviews within `ROLLING_WINDOW_WEEKS` from today |
 
@@ -70,7 +70,7 @@ This plan maps each phase to concrete tasks, files to create, dependencies, and 
 ### Tasks
 | # | Task | File(s) | Details |
 |---|------|---------|---------|
-| 3.1 | Prompt templates | `prompts.py` | System prompt + per-cluster user prompt; include tone guide and output JSON schema |
+| 3.1 | Prompt templates | `prompts.py` | System prompt + per-cluster user prompt; include tone guide, output JSON schema, and explicitly prohibit emojis |
 | 3.2 | Synthesizer | `synthesizer.py` | Send cluster representatives to Groq/Llama3; parse structured JSON response into `Theme` objects |
 | 3.3 | Quote validator | `quote_validator.py` | For each LLM-returned quote, verify it exists as a substring in the original review corpus; reject invalid quotes |
 | 3.4 | Token budgeting | `synthesizer.py` | Track cumulative token usage; abort if budget exceeded |
@@ -89,7 +89,7 @@ This plan maps each phase to concrete tasks, files to create, dependencies, and 
 ### Tasks
 | # | Task | File(s) | Details |
 |---|------|---------|---------|
-| 4.1 | Doc renderer | `doc_renderer.py` | Convert `PulseReport` → Markdown with heading `## Weekly Pulse — {product} — Week {iso_week}`; include themes, quotes (blockquotes), and action ideas |
+| 4.1 | Doc renderer | `doc_renderer.py` | Convert `PulseReport` → Markdown with heading `## Weekly Pulse — {product} — Week {iso_week}`; limit themes/quotes to strictly fit 1 page |
 | 4.2 | Email renderer | `email_renderer.py` | Convert `PulseReport` → HTML teaser: top 3 theme bullets + "Read full report →" deep link placeholder |
 | 4.3 | Heading anchor | `doc_renderer.py` | Generate a stable anchor string `pulse-{product}-{iso_week}` for idempotency checks |
 
@@ -108,7 +108,7 @@ This plan maps each phase to concrete tasks, files to create, dependencies, and 
 | # | Task | File(s) | Details |
 |---|------|---------|---------|
 | 5.1 | Create FastMCP Server | `server.py` | Implement a custom MCP server using `FastMCP` with tools for `docs_get_document` and `docs_batch_update`. |
-| 5.2 | MCP Client setup | `docs_client.py` | Connect to the local `server.py` using `stdio_client`. |
+| 5.2 | MCP Client setup | `docs_client.py` | Connect to the local `server.py` using `stdio_client` automatically to avoid manual triggers. |
 | 5.3 | Idempotency check | `docs_client.py` | Read Doc content via the tool; search for the week's heading anchor; skip if found. |
 | 5.4 | Append section | `docs_client.py` | Call `docs_batch_update` to insert the Markdown section at the top of the Doc. |
 
@@ -127,7 +127,7 @@ This plan maps each phase to concrete tasks, files to create, dependencies, and 
 | # | Task | File(s) | Details |
 |---|------|---------|---------|
 | 6.1 | Create FastMCP Server | `server.py` | Implement a custom MCP server using `FastMCP` with tools for `gmail_send_message` and `gmail_create_draft`. |
-| 6.2 | MCP Client setup | `gmail_client.py` | Connect to the local `server.py`. |
+| 6.2 | MCP Client setup | `gmail_client.py` | Connect to the local `server.py` using `stdio_client` automatically to avoid manual triggers. |
 | 6.3 | Send Teaser | `gmail_client.py` | Call the appropriate tool based on `SEND_MODE` (draft vs send). |
 | 6.4 | Idempotency | `gmail_client.py` | Check `run_log` for existing `email_message_id` for this `(product, iso_week)` |
 

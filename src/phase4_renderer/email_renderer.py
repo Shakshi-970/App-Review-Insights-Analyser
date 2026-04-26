@@ -39,7 +39,7 @@ class EmailRenderer:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Weekly Pulse &middot; {report.product} &middot; {week_label}</title>
+  <title>{report.product} — Weekly Review Pulse — {week_label}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#F0EEFF;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
 
@@ -63,7 +63,7 @@ class EmailRenderer:
 
             <h1 style="margin:0 0 8px;font-size:30px;font-weight:800;
                         color:#ffffff;letter-spacing:-0.5px;line-height:1.1;">
-              {report.product}
+              {report.product} — Weekly Review Pulse
             </h1>
 
             <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.75);letter-spacing:0.3px;">
@@ -192,7 +192,19 @@ class EmailRenderer:
         blocks = ""
         for i, theme in enumerate(themes):
             accent = _CARD_ACCENTS[i % len(_CARD_ACCENTS)]
-            quote  = theme.quotes[0] if theme.quotes else ""
+            
+            # Deduplicate quotes
+            seen = set()
+            unique_quotes = []
+            for q in theme.quotes:
+                q_clean = q.strip().strip('"').strip("'")
+                q_lower = q_clean.lower()
+                if q_lower not in seen:
+                    seen.add(q_lower)
+                    unique_quotes.append(q_clean)
+                    
+            quote  = unique_quotes[0] if unique_quotes else ""
+            
             blocks += f"""            <table width="100%" cellpadding="0" cellspacing="0" border="0"
                    style="margin-bottom:12px;">
               <tr>

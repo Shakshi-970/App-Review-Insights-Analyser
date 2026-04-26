@@ -1,9 +1,14 @@
+import logging
+import time
+
 import numpy as np
 from typing import List
 from umap import UMAP
 from sklearn.cluster import HDBSCAN
 
 from src.phase0_foundations.models import CleanReview, Cluster
+
+logger = logging.getLogger(__name__)
 
 
 class Clusterer:
@@ -19,9 +24,9 @@ class Clusterer:
 
     def __init__(
         self,
-        umap_n_neighbors: int = 15,
+        umap_n_neighbors: int = 5,
         umap_min_dist: float = 0.1,
-        umap_n_components: int = 5,
+        umap_n_components: int = 2,
         hdbscan_min_cluster_size: int = 5,
         top_k_representatives: int = 10,
         random_state: int = 42,
@@ -49,6 +54,7 @@ class Clusterer:
 
         # Edge case: too few reviews to cluster
         if n < self.hdbscan_min_cluster_size:
+            print(f"      Too few reviews ({n} < {self.hdbscan_min_cluster_size}) — using single 'General Feedback' cluster.")
             return [
                 Cluster(
                     cluster_id=0,
@@ -59,13 +65,22 @@ class Clusterer:
             ]
 
         # --- UMAP dimensionality reduction ---
+        print(f"      UMAP: reducing {n} reviews from {embeddings.shape[1]} -> {self.umap_n_components} dims "
+              f"(n_neighbors={min(self.umap_n_neighbors, n-1)})...")
+        t0 = time.time()
         reduced = self._reduce(embeddings, n)
+        print(f"      UMAP done in {time.time() - t0:.1f}s — output shape {reduced.shape}.")
 
         # --- HDBSCAN clustering ---
+        print(f"      HDBSCAN: clustering {n} points (min_cluster_size={self.hdbscan_min_cluster_size})...")
+        t0 = time.time()
         labels = HDBSCAN(
             min_cluster_size=self.hdbscan_min_cluster_size,
             min_samples=1,
         ).fit_predict(reduced)
+        n_named = len(set(labels) - {-1})
+        n_noise = int((labels == -1).sum())
+        print(f"      HDBSCAN done in {time.time() - t0:.1f}s — {n_named} clusters, {n_noise} noise points.")
 
         return self._build_clusters(embeddings, reviews, labels)
 
@@ -86,7 +101,8 @@ class Clusterer:
             )
             return reducer.fit_transform(embeddings)
         except Exception as e:
-            print(f"  [UMAP fallback] {e} — using raw embeddings")
+            print(f"      [UMAP fallback] {e} — using raw embeddings.")
+            logger.warning("UMAP failed (%s) — falling back to raw embeddings.", e)
             return embeddings
 
     def _build_clusters(
@@ -97,6 +113,7 @@ class Clusterer:
     ) -> List[Cluster]:
         unique_labels = sorted(set(labels.tolist()))
         clusters: List[Cluster] = []
+        logger.debug("Building clusters for labels: %s", unique_labels)
 
         for label in unique_labels:
             mask = labels == label

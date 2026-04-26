@@ -64,5 +64,15 @@ class GmailClient:
             return tool_result
 
     def run_send_teaser(self, recipient: str, subject: str, html_content: str) -> Dict[str, Any]:
-        """Synchronous wrapper for send_teaser."""
-        return asyncio.run(self.send_teaser(recipient, subject, html_content))
+        """Synchronous wrapper for send_teaser with advanced error unwrapping."""
+        try:
+            return asyncio.run(self.send_teaser(recipient, subject, html_content))
+        except Exception as e:
+            # Handle Python 3.11+ ExceptionGroup (TaskGroup errors)
+            error_msg = str(e)
+            if hasattr(e, "exceptions") and e.exceptions:
+                error_msg = f"{type(e.exceptions[0]).__name__}: {str(e.exceptions[0])}"
+            
+            import logging
+            logging.error(f"Gmail Client Error: {error_msg}")
+            return {"status": "error", "message": f"Gmail process crash: {error_msg}"}

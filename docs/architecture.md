@@ -11,7 +11,7 @@ The **Weekly Product Review Pulse** is an **AI Agent** that autonomously:
 5. Appends that report to a product-specific Google Doc via a **Google Docs MCP server**.
 6. Sends a teaser notification email via a **Gmail MCP server**.
 
-The agent is an **MCP host / client**; it never embeds Google credentials or calls Workspace REST APIs directly. All human-visible delivery flows through dedicated MCP servers.
+The agent is an **MCP host / client**; it never embeds Google credentials or calls Workspace REST APIs directly. It relies on automated local subprocesses (stdio) for MCP servers to eliminate manual terminal triggers, ensuring it is deployment ready out-of-the-box.
 
 ---
 
@@ -26,7 +26,7 @@ graph TB
     subgraph "Data Acquisition (Phase 1)"
         APP[App Store Scraper]
         PLAY[Play Store Scraper]
-        PII[PII Scrubber]
+        PII[PII Scrubber (removes PII & emojis)]
     end
 
     subgraph "Intelligence (Phase 2 + 3)"
@@ -73,11 +73,11 @@ graph TB
 | Phase | Name | Directory | Responsibility |
 |-------|------|-----------|----------------|
 | 0 | Foundations | `src/phase0_foundations/` | Config, data models (Pydantic), run log, shared utilities |
-| 1 | Ingestion | `src/phase1_ingestion/` | App Store RSS scraper, Play Store scraper, PII scrubber, deduplication |
+| 1 | Ingestion | `src/phase1_ingestion/` | App Store RSS scraper, Play Store scraper, PII scrubber (removes emojis), deduplication |
 | 2 | Clustering | `src/phase2_clustering/` | Sentence-transformer embeddings → UMAP → HDBSCAN |
 | 3 | Summarization | `src/phase3_summarization/` | LLM prompts for theme naming, quote selection, action ideas; quote validator |
 | 4 | Renderer | `src/phase4_renderer/` | Structured report assembly (Markdown for Docs, HTML for email) |
-| 5 | Docs MCP | `src/phase5_docs_mcp/` | MCP client wrapper for Google Docs — append section, idempotency check |
+| 5 | Docs MCP | `src/phase5_docs_mcp/` | MCP client wrapper for Google Docs — append section (strictly 1 page), idempotency check |
 | 6 | Gmail MCP | `src/phase6_gmail_mcp/` | MCP client wrapper for Gmail — compose teaser, send/draft, deep-link insertion |
 | 7 | Orchestration | `src/phase7_orchestration/` | AI Agent loop — tool registry, LLM reasoning, step sequencing, error handling |
 
@@ -92,7 +92,7 @@ graph TB
 │  Step 1 ─► Ingestion Tool (Phase 1)                                    │
 │            ├── App Store RSS → parse XML → normalize                   │
 │            ├── Play Store scraper → parse HTML → normalize              │
-│            └── PII Scrubber → redact emails, phones, IDs               │
+│            └── PII Scrubber → redact emails, phones, IDs, and strip emojis   │
 │            Returns: List[CleanReview]                                   │
 │                                                                         │
 │  Step 2 ─► Clustering Tool (Phase 2)                                   │
@@ -109,7 +109,7 @@ graph TB
 │            Returns: PulseReport (themes, quotes, actions)              │
 │                                                                         │
 │  Step 4 ─► Renderer Tool (Phase 4)                                     │
-│            ├── Build Markdown body for Google Docs                      │
+│            ├── Build Markdown body for Google Docs (Strictly 1-page limits)     │
 │            └── Build HTML teaser for Gmail                              │
 │            Returns: RenderedReport (doc_body, email_html)              │
 │                                                                         │
@@ -231,7 +231,7 @@ graph LR
 
 ### 6.4 Credential Isolation
 - Google OAuth tokens live **inside the MCP server's configuration** — never in agent code or `.env`.
-- The agent authenticates to MCP servers via **stdio transport** (local) or **SSE transport** (remote).
+- The agent authenticates to MCP servers via **stdio transport** (local subprocess, fully automated) or **SSE transport** (remote).
 
 ---
 
@@ -247,7 +247,7 @@ graph LR
 
 ## 8. Security & Safety
 
-- **PII scrubbing** (Phase 1): Regex + pattern matching removes emails, phone numbers, Aadhaar-like IDs before any LLM call.
+- **PII & Emoji scrubbing** (Phase 1): Regex + pattern matching removes emails, phone numbers, Aadhaar-like IDs, and emojis before any LLM call.
 - **Reviews as data**: System prompts instruct the LLM to treat review text as data to summarize — never as instructions to execute.
 - **Cost / token limits**: Each run enforces a configurable token budget; exceeding it aborts gracefully.
 - **Audit trail**: Every tool call (input hash + output hash + timestamp) is recorded in `run_log.db`.
