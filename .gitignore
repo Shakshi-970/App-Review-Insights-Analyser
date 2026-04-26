@@ -40,3 +40,16 @@ credentials_b64.txt
 # Personal/draft files
 README.md
 deliverables/linkedin_post.md
+
+# Scratch / local test scripts
+scratch/
+
+# HuggingFace Space sub-repos (managed separately via hf-deploy/)
+hf-deploy/
+
+# Generated deliverable docs
+"Email Doc.docx"
+"Email Doc.pdf"
+deliverables/README.docx
+deliverables/README.pdf
+deliverables/README.txt
