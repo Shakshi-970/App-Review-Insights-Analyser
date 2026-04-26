@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     SENDER_EMAIL: str = ""
     GMAIL_APP_PASSWORD: str = ""
 
+    # Gmail API OAuth2 — preferred over SMTP (works on HF Spaces where SMTP is blocked)
+    GMAIL_CLIENT_ID: str = ""
+    GMAIL_CLIENT_SECRET: str = ""
+    GMAIL_REFRESH_TOKEN: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()

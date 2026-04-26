@@ -89,34 +89,79 @@ class EmailRequest(BaseModel):
     subject: str
     html: str
 
+def _send_via_gmail_api(sender: str, recipient: str, subject: str, html: str):
+    """Send via Gmail REST API (HTTPS/443) — works on HF Spaces where SMTP is blocked."""
+    import base64
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+    from googleapiclient.discovery import build
+
+    creds = Credentials(
+        token=None,
+        refresh_token=settings.GMAIL_REFRESH_TOKEN,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=settings.GMAIL_CLIENT_ID,
+        client_secret=settings.GMAIL_CLIENT_SECRET,
+        scopes=["https://www.googleapis.com/auth/gmail.send"],
+    )
+    creds.refresh(Request())
+
+    msg = MIMEMultipart()
+    msg["From"] = sender
+    msg["To"] = recipient
+    msg["Subject"] = subject
+    msg.attach(MIMEText(html, "html"))
+
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+    service = build("gmail", "v1", credentials=creds)
+    service.users().messages().send(userId="me", body={"raw": raw}).execute()
+
+
 @app.post("/send_email_direct")
 async def send_email_direct(req: EmailRequest):
     """
-    Send the email directly via SMTP — bypasses MCP entirely.
-    This is the ONLY place email actually gets sent from the portal.
-    Called exclusively by the user clicking "Send Email" in the UI.
+    Send the email — uses Gmail API (HTTPS) when OAuth2 creds are set,
+    falls back to SMTP for local dev. Called by the Send Email button in the UI.
     """
     recipient = settings.RECIPIENT_EMAIL
     if not recipient:
         return {"status": "error", "message": "RECIPIENT_EMAIL not set"}
-    
+
     sender = settings.SENDER_EMAIL
+    if not sender:
+        return {"status": "error", "message": "SENDER_EMAIL not set"}
+
+    # ── Gmail API path (HF Spaces / any SMTP-blocked host) ────────────────────
+    if settings.GMAIL_CLIENT_ID and settings.GMAIL_CLIENT_SECRET and settings.GMAIL_REFRESH_TOKEN:
+        try:
+            await asyncio.to_thread(
+                _send_via_gmail_api, sender, recipient, req.subject, req.html
+            )
+            return {"status": "ok", "message": f"Email sent to {recipient}"}
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {"status": "error", "message": f"Gmail API error: {str(e)}"}
+
+    # ── SMTP fallback (local dev) ──────────────────────────────────────────────
     app_password = settings.GMAIL_APP_PASSWORD
-    if not sender or not app_password:
-        return {"status": "error", "message": "SENDER_EMAIL or GMAIL_APP_PASSWORD not set"}
-    
+    if not app_password:
+        return {"status": "error", "message": "Set GMAIL_REFRESH_TOKEN+CLIENT_ID+CLIENT_SECRET (or GMAIL_APP_PASSWORD for local dev)"}
+
     try:
         import smtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
 
         msg = MIMEMultipart()
-        msg['From'] = sender
-        msg['To'] = recipient
-        msg['Subject'] = req.subject
-        msg.attach(MIMEText(req.html, 'html'))
+        msg["From"] = sender
+        msg["To"] = recipient
+        msg["Subject"] = req.subject
+        msg.attach(MIMEText(req.html, "html"))
 
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=15) as server:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as server:
             server.login(sender, app_password)
             server.send_message(msg)
 
